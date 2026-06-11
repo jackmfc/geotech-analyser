@@ -90,7 +90,7 @@
               Pattern-based extraction aid, not a substitute for reading the report. Geotechnical reports vary in wording
               and layout, so some items may be missed or mis-read — verify every field against the source report, which
               governs. Site classification, footing design and bearing values must be taken from the original report and
-              AS 2870 / AS 3600 by the responsible practitioner.
+              AS 2870 / AS 3600 by the design engineer.
             </div>
           </div>
         </div>
@@ -305,10 +305,10 @@ function buildPDF(){
   doc.setTextColor(20,28,38);
 
   y=ensure(doc,y+3,20,M); doc.setFont("helvetica","normal"); doc.setFontSize(8); doc.setTextColor(110);
-  y=wrap(doc,"This summary is a pattern-based extraction from the PDF text and may miss or mis-read items; every value must be verified against the original geotechnical report, which governs. Site classification, footing design, bearing capacity and durability requirements are to be taken from the report and AS 2870 / AS 3600 by the responsible practitioner. Generated as an aid only.",M,y,W-2*M,3.4);
+  y=wrap(doc,"This summary is a pattern-based extraction from the PDF text and may miss or mis-read items; every value must be verified against the original geotechnical report, which governs. Site classification, footing design, bearing capacity and durability requirements are to be taken from the report and AS 2870 / AS 3600 by the design engineer. Generated as a design aid only.",M,y,W-2*M,3.4);
 
   y=ensure(doc,y+4,20,M); doc.setDrawColor(180); doc.line(M,y+9,M+70,y+9); doc.line(right-70,y+9,right,y+9);
-  doc.setFontSize(8.5); doc.setTextColor(90); txt("Summarised by: ____________________",M,y+14); txt("Source: "+(DATA.file||"")+"  ("+(DATA.pages||"?")+" pp)",right-70,y+14);
+  doc.setFontSize(8.5); doc.setTextColor(90); txt("Design engineer: ____________________",M,y+14); txt("Source: "+(DATA.file||"")+"  ("+(DATA.pages||"?")+" pp)",right-70,y+14);
 
   doc.save((v.ref||"geotech").replace(/[^\w -]+/g,"_").trim()+" - Geotech Summary.pdf");
 }

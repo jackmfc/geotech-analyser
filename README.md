@@ -1,8 +1,8 @@
 # Geotech Report Analyser — AS 2870
 
 A self-contained, **fully client-side** browser tool that reads a geotechnical report PDF and extracts
-the key parameters a building surveyor / engineer needs into an **editable summary**, then exports a
-branded "Comps" summary PDF.
+the key parameters the **design engineer** needs into an **editable summary**, then exports a branded
+summary PDF.
 
 **🔒 Private:** the PDF is read entirely in your browser via pdf.js — **nothing is uploaded** anywhere.
 No server, no API key.
