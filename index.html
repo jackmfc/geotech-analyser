@@ -1,0 +1,319 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>Geotech Report Analyser — AS 2870</title>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.min.js"></script>
+<script src="logo.js"></script>
+<style>
+  :root{--bg:#0f1722;--panel:#16202e;--panel2:#1d2a3a;--line:#2a3a4f;--txt:#e8eef5;--muted:#9fb0c3;--accent:#3da9fc;--good:#34c77b;--bad:#ff5c6c;--warn:#ffb454;}
+  *{box-sizing:border-box}
+  body{margin:0;font:15px/1.5 -apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,Helvetica,Arial,sans-serif;background:var(--bg);color:var(--txt)}
+  header{padding:18px 28px;border-bottom:1px solid var(--line);background:var(--panel);display:flex;align-items:baseline;gap:14px;flex-wrap:wrap}
+  header h1{font-size:18px;margin:0;font-weight:650}
+  header .sub{color:var(--muted);font-size:13px}
+  .wrap{max-width:1200px;margin:0 auto;padding:22px 28px 90px}
+  .drop{border:2px dashed var(--line);border-radius:14px;background:var(--panel);padding:34px 22px;text-align:center;color:var(--muted);cursor:pointer;transition:.15s;margin-bottom:20px}
+  .drop:hover,.drop.over{border-color:var(--accent);background:var(--panel2);color:var(--txt)}
+  .drop .big{font-size:16px;color:var(--txt);font-weight:600;margin-bottom:6px}
+  .drop .priv{font-size:12px;color:var(--good);margin-top:8px}
+  .grid{display:grid;grid-template-columns:1.25fr 0.75fr;gap:24px}
+  @media(max-width:940px){.grid{grid-template-columns:1fr}}
+  .card{background:var(--panel);border:1px solid var(--line);border-radius:12px;padding:18px 20px;margin-bottom:20px}
+  .card h2{font-size:14px;text-transform:uppercase;letter-spacing:.06em;color:var(--accent);margin:0 0 14px;font-weight:650}
+  label{display:block;font-size:12px;color:var(--muted);margin:0 0 3px}
+  .field{margin-bottom:13px}
+  input,textarea{width:100%;background:var(--panel2);border:1px solid var(--line);color:var(--txt);border-radius:8px;padding:8px 10px;font-size:14px;font-family:inherit}
+  input:focus,textarea:focus{outline:none;border-color:var(--accent)}
+  textarea{resize:vertical;min-height:46px}
+  .field.found input,.field.found textarea{border-left:3px solid var(--good)}
+  .field.missing input,.field.missing textarea{border-left:3px solid var(--warn)}
+  .src{font-size:11px;color:var(--muted);margin-top:3px;font-style:italic;line-height:1.4}
+  .tag{display:inline-block;font-size:10px;border-radius:5px;padding:1px 6px;margin-left:6px;vertical-align:middle}
+  .tag.f{background:rgba(52,199,123,.16);color:var(--good)} .tag.m{background:rgba(255,180,84,.16);color:var(--warn)}
+  .sticky{position:sticky;top:22px}
+  .flag{display:flex;justify-content:space-between;gap:8px;padding:8px 11px;border-radius:8px;background:var(--panel2);margin-bottom:7px;font-size:13px;border:1px solid var(--line)}
+  .flag.hit{border-color:rgba(255,92,108,.5)} .flag.hit .s{color:var(--bad);font-weight:650}
+  .flag.clear .s{color:var(--muted)}
+  .actions{display:flex;gap:10px;margin-top:14px;flex-wrap:wrap}
+  button{cursor:pointer;border:none;border-radius:9px;padding:11px 16px;font-size:14px;font-weight:600;font-family:inherit}
+  button.primary{background:var(--accent);color:#04121f} button.ghost{background:var(--panel2);color:var(--txt);border:1px solid var(--line)}
+  button:disabled{opacity:.5;cursor:not-allowed}
+  .status{font-size:13px;color:var(--muted);margin:6px 0}
+  .status.err{color:var(--bad)} .status.ok{color:var(--good)}
+  .disclaimer{font-size:11.5px;color:var(--muted);line-height:1.5;margin-top:14px;border-top:1px dashed var(--line);padding-top:12px}
+  details{margin-top:10px} summary{cursor:pointer;color:var(--accent);font-size:13px}
+  #rawText{width:100%;min-height:200px;margin-top:8px;font-size:12px;font-family:ui-monospace,Menlo,monospace}
+  .meta{font-size:12px;color:var(--muted);margin-bottom:10px}
+  .hidden{display:none}
+</style>
+</head>
+<body>
+<header>
+  <h1>Geotech Report Analyser — AS 2870</h1>
+  <span class="sub">drag-drop a geotechnical PDF · read in-browser · key parameters extracted into an editable summary</span>
+</header>
+
+<div class="wrap">
+  <div class="drop" id="drop">
+    <div class="big">Drag &amp; drop a geotechnical report PDF here</div>
+    <div>…or click to choose a file</div>
+    <div class="priv">🔒 The PDF is read entirely in your browser — nothing is uploaded.</div>
+    <input type="file" id="file" accept="application/pdf" class="hidden">
+  </div>
+  <div class="status" id="status"></div>
+
+  <div id="results" class="hidden">
+    <div class="grid">
+      <div>
+        <div class="card">
+          <h2>Extracted summary <span class="meta" style="text-transform:none;letter-spacing:0">— review &amp; edit; ✓ = found in report, ⚠ = not found</span></h2>
+          <div id="fields"></div>
+        </div>
+      </div>
+      <div>
+        <div class="sticky">
+          <div class="card">
+            <h2>Hazard &amp; condition flags</h2>
+            <div id="flags"></div>
+            <div class="actions">
+              <button class="primary" id="pdfBtn">Download Comps</button>
+              <button class="ghost" id="clearBtn">New file</button>
+            </div>
+            <details><summary>Full extracted text &amp; search</summary>
+              <input id="rawSearch" placeholder="search the report text…" style="margin-top:8px">
+              <textarea id="rawText" readonly></textarea>
+            </details>
+            <div class="disclaimer">
+              Pattern-based extraction aid, not a substitute for reading the report. Geotechnical reports vary in wording
+              and layout, so some items may be missed or mis-read — verify every field against the source report, which
+              governs. Site classification, footing design and bearing values must be taken from the original report and
+              AS 2870 / AS 3600 by the responsible practitioner.
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<script>
+const $ = id => document.getElementById(id);
+pdfjsLib.GlobalWorkerOptions.workerSrc = "https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.worker.min.js";
+
+/* ---------- field definitions (AS 2870 / AU geotech) ---------- */
+const FIELDS = [
+  {g:"Classification & reactivity"},
+  {k:"siteClass", label:"AS 2870 site class", ph:"A / S / M / M-D / H1 / H2 / E / P"},
+  {k:"ys", label:"Characteristic surface movement ys (mm)", ph:"e.g. 40"},
+  {k:"reactivity", label:"Soil reactivity", ph:"e.g. moderately reactive clay"},
+  {k:"climate", label:"Climate zone / Thornthwaite", ph:""},
+  {g:"Footings & bearing"},
+  {k:"footing", label:"Recommended footing system", ph:"e.g. stiffened raft slab", area:1},
+  {k:"founding", label:"Founding depth / min. embedment", ph:"e.g. 0.5 m"},
+  {k:"bearing", label:"Allowable bearing pressure (kPa)", ph:"e.g. 100 kPa @ 0.5 m"},
+  {k:"foundMat", label:"Founding material", ph:"e.g. stiff clay"},
+  {g:"Soil profile & groundwater"},
+  {k:"profile", label:"Soil profile / strata summary", ph:"topsoil / fill / clay / sand / rock with depths", area:1},
+  {k:"fill", label:"Fill", ph:"present? type & depth"},
+  {k:"groundwater", label:"Groundwater", ph:"depth, or not encountered"},
+  {g:"Investigation & durability"},
+  {k:"invest", label:"Boreholes / test pits / CPTs", ph:"e.g. 4 boreholes to 5 m"},
+  {k:"exposure", label:"Concrete exposure / sulfate", ph:"e.g. exposure class A2"},
+  {g:"Report metadata"},
+  {k:"ref", label:"Report reference / number", ph:""},
+  {k:"date", label:"Report date", ph:""},
+  {k:"consultant", label:"Geotechnical consultant", ph:""},
+  {k:"client", label:"Client", ph:""},
+  {k:"address", label:"Site address", ph:""},
+];
+
+/* hazard / condition keyword flags */
+const FLAGS = [
+  {k:"reactive", label:"Reactive / expansive soil", re:/reactive|expansive|shrink[- ]?swell/i},
+  {k:"fill", label:"Fill (esp. uncontrolled)", re:/uncontrolled fill|existing fill|\bfill\b/i},
+  {k:"ass", label:"Acid sulfate soils", re:/acid\s+sulf[ap]hate|\bass\b(?![a-z])/i},
+  {k:"salinity", label:"Salinity", re:/salin/i},
+  {k:"slope", label:"Slope / landslip", re:/landslip|landslide|slope\s+stability|sloping\s+site|geotechnical\s+hazard/i},
+  {k:"contam", label:"Contamination", re:/contaminat/i},
+  {k:"asbestos", label:"Asbestos", re:/asbestos/i},
+  {k:"soft", label:"Soft / compressible soils", re:/soft\s+(?:clay|soil|silt)|compressible|low\s+strength/i},
+  {k:"rock", label:"Rock / rippability", re:/rippab|bedrock|\brock\b|refusal/i},
+  {k:"settle", label:"Settlement noted", re:/settlement/i},
+];
+
+/* ---------- extraction ---------- */
+function snip(T, idx, len){ const a=Math.max(0,idx-45); return "…"+T.slice(a, idx+len).replace(/\s+/g," ").trim()+"…"; }
+function first(T, res){
+  for(const re of [].concat(res)){ const m=T.match(re); if(m){ return {value:(m[1]!==undefined?m[1]:m[0]).trim(), snippet:snip(T,m.index,160)}; } }
+  return null;
+}
+function collect(T, re, max){ const out=[]; let m; const r=new RegExp(re.source, re.flags.includes("g")?re.flags:re.flags+"g");
+  while((m=r.exec(T))&&out.length<(max||6)){ out.push(m[1]!==undefined?m[1]:m[0]); } return out; }
+
+function analyse(raw){
+  const T = raw.replace(/ /g," ").replace(/[ \t]+/g," ");
+  const f = {};
+  f.siteClass = first(T,[
+    /\bsite\s+class(?:ification)?\b[^A-Za-z]{0,15}(?:is|of|as|being|=|:)?[^A-Za-z]{0,6}(?:class\s+)?\b(M\-D|H1|H2|A|S|M|H|E|P)\b/i,
+    /\bclass(?:ified)?\s+(?:as\s+)?(?:a\s+)?(?:class\s+)?\b(M\-D|H1|H2|A|S|M|H|E|P)\b[\s\S]{0,80}?as\s?2870/i,
+    /\bclass\s+(M\-D|H1|H2|A|S|M|H|E|P)\b\s*(?:site|\(|in\b|under\b)/i ]);
+  f.ys = first(T,[
+    /(?:characteristic\s+surface\s+movement|design\s+surface\s+movement|surface\s+movement|\by_?s\b)[^0-9]{0,30}(\d+(?:\.\d+)?)\s*mm/i ]);
+  f.reactivity = first(T,[/((?:highly|very|moderately|slightly|non)[- ]?reactive[^.,;]{0,40})/i, /(reactive\s+(?:clay|soil|site)[^.,;]{0,30})/i, /(expansive\s+(?:clay|soil)[^.,;]{0,30})/i]);
+  f.climate = first(T,[/(?:climate\s+zone|thornthwaite)[^.]{0,40}?(zone\s*\d+|[-+]?\d+(?:\.\d+)?)/i]);
+  f.footing = first(T,[
+    /((?:stiffened|waffle|edge[- ]?beam)\s*raft(?:\s+slab)?)/i,
+    /(waffle\s*pod(?:\s+slab)?)/i, /(raft\s+slab)/i,
+    /(strip\s+foot(?:ing)?s?)/i, /(pad\s+foot(?:ing)?s?)/i,
+    /(bored\s+pier?s?|cast[- ]?in[- ]?pier?s?)/i, /(screw\s+piles?|driven\s+piles?|cfa\s+piles?)/i,
+    /(slab\s+on\s+ground)/i ]);
+  f.founding = first(T,[
+    /found(?:ing|ed)?\s+(?:depth|at|level|material\s+at)\s*(?:of|=|:)?\s*(?:approximately\s*)?(\d+(?:\.\d+)?\s*m(?:m)?)\b/i,
+    /minimum\s+(?:footing\s+|founding\s+|embedment\s+)?(?:depth|embedment)\s*(?:of|=|:)?\s*(?:approximately\s*)?(\d+(?:\.\d+)?\s*m(?:m)?)/i,
+    /found(?:ed)?\s+(?:a\s+)?minimum\s+of\s+(\d+(?:\.\d+)?\s*m(?:m)?)/i ]);
+  const bearings = collect(T, /(\d{2,4})\s*kpa/ig, 8);
+  const bearingCtx = first(T,[/((?:allowable|ultimate|safe|design|net)\s+bearing\s+(?:pressure|capacity)[^.]{0,80})/i, /(bearing\s+(?:pressure|capacity)[^.]{0,70}\d{2,4}\s*kpa)/i]);
+  f.bearing = bearingCtx ? {value:bearingCtx.value.replace(/\s+/g," "), snippet:bearingCtx.snippet} : (bearings.length?{value:bearings.join(", ")+" kPa (values found — verify context)", snippet:""}:null);
+  f.foundMat = first(T,[
+    /found(?:ing|ed)?\s+(?:depth\s+)?(?:in|on|within|into)\s+(?:the\s+)?((?:very\s+stiff|stiff|hard|firm|dense|medium\s+dense|weathered)?\s*(?:clay|sand|silt|gravel|rock|residual\s+soil|siltstone|sandstone)[^.,;]{0,20})/i,
+    /found(?:ing|ed)?\s+(?:material|stratum)\s*(?:of|:|is)?\s*((?:very\s+stiff|stiff|hard|firm|dense)?\s*(?:clay|sand|silt|gravel|rock|siltstone|sandstone)[^.,;]{0,20})/i]);
+  f.profile = first(T,[
+    /((?:topsoil|surface\s+soil|fill)\b[\s\S]{0,200}?(?:rock|refusal|siltstone|sandstone|bedrock)\b[^.]{0,20})/i,
+    /((?:topsoil|surface\s+soil)\b[\s\S]{0,160}?(?:clay|sand|silt)[\s\S]{0,40})/i]);
+  f.fill = first(T,[
+    /((?:uncontrolled|controlled|existing|engineered)\s+fill\b[^,;]{0,55}?\d+(?:\.\d+)?\s*m)/i,
+    /((?:uncontrolled|controlled|existing|engineered)\s+fill[^.,;]{0,45})/i,
+    /(fill\s+(?:was\s+)?(?:encountered|observed|present)[^,;]{0,45}?\d+(?:\.\d+)?\s*m)/i,
+    /(fill\s+(?:was\s+)?(?:encountered|observed|present)[^.,;]{0,40})/i]);
+  f.groundwater = first(T,[
+    /(no\s+(?:free\s+)?(?:ground\s?water|water\s+table)\s+(?:was\s+)?(?:encountered|observed|noted|recorded))/i,
+    /((?:ground\s?water|water\s+table|seepage)\s+(?:was\s+)?(?:encountered|observed|noted|recorded|measured)?\s*(?:at\s+)?(?:a\s+depth\s+of\s+)?(?:approximately\s*)?\d+(?:\.\d+)?\s*m)/i ]);
+  f.invest = first(T,[/((?:\d+|one|two|three|four|five|six|seven|eight|nine|ten)\s+(?:no\.?\s+)?(?:boreholes?|test\s?pits?|bores?|cpts?|hand\s?augers?|dcp\s?tests?)[^.]{0,55})/i]);
+  f.exposure = first(T,[/(exposure\s+class(?:ification)?\s*(?:[:\-=]|is|of|adopted\s+as)?\s*(?:A1|A2|B1|B2|C1|C2|U)\b)/i, /((?:A1|A2|B1|B2|C1|C2)\s+exposure)/i, /(sulfate\s+(?:attack|exposure|class)[^.]{0,40})/i]);
+  f.ref = first(T,[/(?:report\s+(?:no\.?|number|ref(?:erence)?)|ref(?:erence)?\s*no\.?|our\s+ref(?:erence)?|project\s+(?:no\.?|number))\s*[:\-]?\s*([A-Za-z0-9][A-Za-z0-9\-\/\._]{3,24})/i]);
+  f.date = first(T,[/(\d{1,2}\s+(?:january|february|march|april|may|june|july|august|september|october|november|december)\s+\d{4})/i, /((?:january|february|march|april|may|june|july|august|september|october|november|december)\s+\d{4})/i, /(\d{1,2}\/\d{1,2}\/\d{2,4})/]);
+  f.consultant = first(T,[/([A-Za-z][A-Za-z&'.\- ]{2,40}(?:geotechnic(?:s|al)(?:\s+(?:engineers|consultants|services|pty))?|consulting\s+engineers|soil\s+testing|geoscience|geotech))/i]);
+  f.client = first(T,[/(?:client|prepared\s+for|on\s+behalf\s+of)\s*[:\-]?\s*([A-Za-z0-9][^\n]{3,50})/i]);
+  f.address = first(T,[/(?:(?:site|property|subject\s+site|address|located\s+at)\s*(?:address)?\s*[:\-]?\s*)((?:lot\s+)?\d[^\n,;]{4,60}(?:vic|nsw|qld|sa|wa|tas|nt|act)?(?:\s*\d{4})?)/i,
+    /((?:lot\s+\d+\s+)?\d+[- ]?\d*\s+[A-Z][a-z]+\s+(?:street|st|road|rd|avenue|ave|drive|dr|court|ct|crescent|cres|lane|place|pl|parade|pde|way|close)[^\n,;]{0,40})/i]);
+
+  // flags
+  const flags = FLAGS.map(F=>{ const m=T.match(F.re); return {label:F.label, hit:!!m, snippet:m?snip(T,m.index,120):""}; });
+  return {f, flags, text:raw};
+}
+
+/* ---------- file handling ---------- */
+let DATA=null;
+async function extractText(arrayBuffer){
+  const pdf = await pdfjsLib.getDocument({data:arrayBuffer}).promise;
+  let text=""; const n=pdf.numPages;
+  for(let i=1;i<=n;i++){ const page=await pdf.getPage(i); const tc=await page.getTextContent();
+    let last=null;
+    tc.items.forEach(it=>{ text += it.str + (it.hasEOL?"\n":" "); });
+    text+="\n";
+  }
+  return {text, pages:n};
+}
+async function handleFile(file){
+  if(!file){ return; }
+  if(file.type!=="application/pdf" && !/\.pdf$/i.test(file.name)){ setStatus("Please drop a PDF file.","err"); return; }
+  setStatus("Reading "+file.name+" …");
+  try{
+    const buf = await file.arrayBuffer();
+    const {text,pages} = await extractText(buf);
+    if(!text.trim() || text.replace(/\s/g,"").length<40){
+      setStatus("No selectable text found — this looks like a scanned/image-only PDF. Use a text PDF, or OCR it first.","err"); return;
+    }
+    DATA = analyse(text); DATA.file=file.name; DATA.pages=pages;
+    renderResults();
+    setStatus("Analysed "+file.name+" ("+pages+" pages). Review the extracted summary; ✓ found, ⚠ not found.","ok");
+  }catch(e){ console.error(e); setStatus("Could not read the PDF: "+e.message,"err"); }
+}
+function setStatus(m,cls){ const s=$("status"); s.textContent=m; s.className="status"+(cls?" "+cls:""); }
+
+/* drop zone */
+const drop=$("drop");
+drop.addEventListener("click",()=>$("file").click());
+$("file").addEventListener("change",e=>handleFile(e.target.files[0]));
+["dragenter","dragover"].forEach(ev=>drop.addEventListener(ev,e=>{e.preventDefault();drop.classList.add("over");}));
+["dragleave","drop"].forEach(ev=>drop.addEventListener(ev,e=>{e.preventDefault();drop.classList.remove("over");}));
+drop.addEventListener("drop",e=>{ const f=e.dataTransfer.files[0]; handleFile(f); });
+window.addEventListener("dragover",e=>e.preventDefault()); window.addEventListener("drop",e=>e.preventDefault());
+
+/* render */
+function renderResults(){
+  const f=DATA.f, host=$("fields"); host.innerHTML="";
+  FIELDS.forEach(item=>{
+    if(item.g){ const h=document.createElement("div"); h.style.cssText="color:var(--accent);font-weight:650;font-size:12px;text-transform:uppercase;letter-spacing:.05em;margin:14px 0 8px"; h.textContent=item.g; host.appendChild(h); return; }
+    const got=f[item.k]; const val=got?got.value:"";
+    const wrap=document.createElement("div"); wrap.className="field "+(got?"found":"missing");
+    const inEl = item.area ? `<textarea id="fld_${item.k}" placeholder="${item.ph||""}">${escapeHtml(val)}</textarea>` : `<input id="fld_${item.k}" placeholder="${item.ph||""}" value="${escapeAttr(val)}">`;
+    wrap.innerHTML = `<label>${item.label}<span class="tag ${got?'f':'m'}">${got?'✓ found':'⚠ not found'}</span></label>${inEl}`+(got&&got.snippet?`<div class="src">source: ${escapeHtml(got.snippet)}</div>`:"");
+    host.appendChild(wrap);
+  });
+  // flags
+  $("flags").innerHTML = DATA.flags.map(fl=>`<div class="flag ${fl.hit?'hit':'clear'}"><span>${fl.label}</span><span class="s">${fl.hit?'⚠ mentioned':'– not found'}</span></div>`).join("");
+  // raw text
+  $("rawText").value = DATA.text;
+  $("results").classList.remove("hidden");
+}
+function escapeHtml(s){return String(s??'').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;');}
+function escapeAttr(s){return escapeHtml(s).replace(/"/g,'&quot;');}
+
+$("rawSearch").addEventListener("input",e=>{
+  const q=e.target.value.trim().toLowerCase(); const ta=$("rawText"); if(!q) return;
+  const i=ta.value.toLowerCase().indexOf(q); if(i>=0){ ta.focus(); ta.setSelectionRange(i,i+q.length); ta.blur(); ta.scrollTop=Math.max(0,(i/ta.value.length)*ta.scrollHeight-80); }
+});
+$("clearBtn").addEventListener("click",()=>{ DATA=null; $("results").classList.add("hidden"); $("file").value=""; setStatus(""); window.scrollTo(0,0); });
+
+/* current edited values */
+function currentValues(){ const o={}; FIELDS.forEach(it=>{ if(it.k){ const el=$("fld_"+it.k); o[it.k]= el?el.value:""; } }); return o; }
+
+/* ---------- PDF report ---------- */
+function san(s){return String(s).replace(/Δ/g,"d").replace(/→/g,"->").replace(/−/g,"-").replace(/≥/g,">=").replace(/≤/g,"<=").replace(/≈/g,"~").replace(/×/g,"x").replace(/²/g,"^2").replace(/³/g,"^3").replace(/✓/g,"[x]").replace(/⚠/g,"!").replace(/🔒/g,"").replace(/[\uD800-\uDFFF]/g,"").replace(/[Ͱ-Ͽ⅐-↏←-⇿∀-⋿⌀-➿]/g,"?");}
+$("pdfBtn").addEventListener("click",()=>{ if(!DATA) return; try{ buildPDF(); }catch(e){ console.error(e); alert("PDF lib not loaded; using print."); window.print(); } });
+
+function buildPDF(){
+  const v=currentValues();
+  const { jsPDF }=window.jspdf; const doc=new jsPDF({unit:"mm",format:"a4"});
+  const _t=doc.text.bind(doc); doc.text=function(s,...r){return _t(Array.isArray(s)?s.map(san):san(s),...r);};
+  const _s=doc.splitTextToSize.bind(doc); doc.splitTextToSize=function(s,...r){return _s(san(String(s)),...r);};
+  const M=18,W=210,right=W-M; let y=M; const txt=(s,x,yy,o)=>doc.text(String(s),x,yy,o);
+
+  let tx=M; if(window.MAYFAIR_LOGO&&window.MAYFAIR_LOGO.dataUri){ const lw=40,lh=lw*window.MAYFAIR_LOGO.h/window.MAYFAIR_LOGO.w;
+    try{ doc.addImage(window.MAYFAIR_LOGO.dataUri,window.MAYFAIR_LOGO.type||"PNG",M,9,lw,lh); tx=M+lw+6; }catch(e){} }
+  doc.setTextColor(20,28,38); doc.setFont("helvetica","bold"); doc.setFontSize(14); txt("Geotechnical Report — Summary", tx,14);
+  doc.setFont("helvetica","normal"); doc.setFontSize(9); doc.setTextColor(90,105,120); txt("AS 2870 key-parameter extract from "+(DATA.file||"report"), tx,19.5);
+  doc.setDrawColor(244,180,130); doc.setLineWidth(0.8); doc.line(M,24,W-M,24); doc.setLineWidth(0.2); y=32; doc.setTextColor(20,28,38);
+
+  FIELDS.forEach(it=>{
+    if(it.g){ y=ensure(doc,y,12,M); doc.setFont("helvetica","bold"); doc.setFontSize(10.5); doc.setTextColor(20,28,38); doc.text(it.g,M,y); y+=2; doc.setDrawColor(220); doc.line(M,y,W-M,y); y+=4.5; return; }
+    const val=(v[it.k]||"").trim()||"—";
+    y=ensure(doc,y,6,M); doc.setFont("helvetica","normal"); doc.setFontSize(9.3); doc.setTextColor(90); doc.text(it.label+":",M+1.5,y);
+    doc.setFont("helvetica","bold"); doc.setTextColor(20,28,38);
+    const lines=doc.splitTextToSize(val, W-2*M-62); doc.text(lines, M+62, y); y+=Math.max(5.6, lines.length*4.6);
+  });
+
+  // flags
+  y=ensure(doc,y,14,M); doc.setFont("helvetica","bold"); doc.setFontSize(10.5); doc.setTextColor(20,28,38); doc.text("Hazard & condition flags",M,y); y+=2; doc.setDrawColor(220); doc.line(M,y,W-M,y); y+=5;
+  doc.setFontSize(9.3);
+  DATA.flags.forEach(fl=>{ y=ensure(doc,y,5.4,M); doc.setFont("helvetica","normal"); doc.setTextColor(fl.hit?200:120, fl.hit?40:120, fl.hit?50:120);
+    doc.text((fl.hit?"! ":"- ")+fl.label+(fl.hit?"  (mentioned in report)":"  (not found)"),M+1.5,y); y+=5; });
+  doc.setTextColor(20,28,38);
+
+  y=ensure(doc,y+3,20,M); doc.setFont("helvetica","normal"); doc.setFontSize(8); doc.setTextColor(110);
+  y=wrap(doc,"This summary is a pattern-based extraction from the PDF text and may miss or mis-read items; every value must be verified against the original geotechnical report, which governs. Site classification, footing design, bearing capacity and durability requirements are to be taken from the report and AS 2870 / AS 3600 by the responsible practitioner. Generated as an aid only.",M,y,W-2*M,3.4);
+
+  y=ensure(doc,y+4,20,M); doc.setDrawColor(180); doc.line(M,y+9,M+70,y+9); doc.line(right-70,y+9,right,y+9);
+  doc.setFontSize(8.5); doc.setTextColor(90); txt("Summarised by: ____________________",M,y+14); txt("Source: "+(DATA.file||"")+"  ("+(DATA.pages||"?")+" pp)",right-70,y+14);
+
+  doc.save((v.ref||"geotech").replace(/[^\w -]+/g,"_").trim()+" - Geotech Summary.pdf");
+}
+function ensure(doc,y,need,M){ if(y+need>284){doc.addPage(); return M;} return y; }
+function wrap(doc,s,x,y,w,lh){ doc.splitTextToSize(String(s),w).forEach(l=>{y=ensure(doc,y,lh,18); doc.text(l,x,y); y+=lh;}); return y; }
+</script>
+</body>
+</html>
