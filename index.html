@@ -157,12 +157,26 @@ function analyse(raw){
   const T = raw.replace(/ /g," ").replace(/[ \t]+/g," ");
   const f = {};
   f.siteClass = first(T,[
-    /\bsite\s+class(?:ification)?\b[^A-Za-z]{0,15}(?:is|of|as|being|=|:)?[^A-Za-z]{0,6}(?:class\s+)?\b(M\-D|H1|H2|A|S|M|H|E|P)\b/i,
-    /\bclass(?:ified)?\s+(?:as\s+)?(?:a\s+)?(?:class\s+)?\b(M\-D|H1|H2|A|S|M|H|E|P)\b[\s\S]{0,80}?as\s?2870/i,
-    /\bclass\s+(M\-D|H1|H2|A|S|M|H|E|P)\b\s*(?:site|\(|in\b|under\b)/i ]);
+    // "site classification ... Class H1" / "Site Class: H1" / "site classification (AS 2870) of M"
+    /\bsite\s+class(?:ification)?\b[^A-Za-z0-9]{0,14}(?:\(?\s*as\s?2870[^)]*\)?)?[^A-Za-z0-9]{0,14}(?:is|of|as|=|:|to\s+be|considered\s+(?:to\s+be|as)|assessed\s+as|adopted\s+as|determined\s+(?:to\s+be|as))?[^A-Za-z0-9]{0,8}(?:class\s+)?['"]?(M\-D|H1|H2|A|S|M|H|E|P)\b/i,
+    // "classified as (a) Class H1" / "classify the site as H1" / "classification of M"
+    /\bclassif(?:y|ied|ication)\b[\s\S]{0,38}?(?:as|of|to\s+be|:)\s*(?:a\s+)?(?:class\s+)?['"]?(M\-D|H1|H2|A|S|M|H|E|P)\b/i,
+    // "Class H1 (highly reactive)" / "Class M site" / "Class 'M'"
+    /\bclass\s+['"]?(M\-D|H1|H2|A|S|M|H|E|P)['"]?\s*(?:\((?:highly|very|moderately|slightly|non)?[- ]?reactive\)|site\b|in\s+accordance|under\s+as\s?2870|classif)/i,
+    // strongest unambiguous tokens near reactive / site class / AS 2870
+    /\b(H1|H2|M\-D)\b[\s\S]{0,28}?(?:reactive|site\s+class|as\s?2870)/i,
+    /(?:as\s?2870)[\s\S]{0,55}?\bclass\b[\s:'"\-]{0,4}(M\-D|H1|H2|A|S|M|H|E|P)\b/i ]);
   f.ys = first(T,[
-    /(?:characteristic\s+surface\s+movement|design\s+surface\s+movement|surface\s+movement|\by_?s\b)[^0-9]{0,30}(\d+(?:\.\d+)?)\s*mm/i ]);
-  f.reactivity = first(T,[/((?:highly|very|moderately|slightly|non)[- ]?reactive[^.,;]{0,40})/i, /(reactive\s+(?:clay|soil|site)[^.,;]{0,30})/i, /(expansive\s+(?:clay|soil)[^.,;]{0,30})/i]);
+    /(?:characteristic|design)\s+surface\s+movement[\s\S]{0,35}?(\d+(?:\.\d+)?)\s*mm/i,
+    /surface\s+movement[\s\S]{0,30}?(\d+(?:\.\d+)?)\s*mm/i,
+    /\by\s?_?\s?s\b\s*(?:=|of|is|approximately|,)?[\s\S]{0,18}?(\d+(?:\.\d+)?)\s*mm/i,
+    /\bI\s?_?\s?ss?\b[\s\S]{0,18}?(\d+(?:\.\d+)?)\s*mm/i ]);
+  f.reactivity = first(T,[
+    /((?:highly|very|moderately|slightly|non)[- ]?reactive(?:\s+(?:clay|soil|site|nature|profile))?[^.,;]{0,28})/i,
+    /(reactive\s+(?:clay|soil|site|nature|profile)[^.,;]{0,28})/i,
+    /(expansive\s+(?:clay|soil)[^.,;]{0,28})/i,
+    /(?:soils?|site|profile|clays?)\s+(?:are|is|appear|considered|assessed)\s+(?:to\s+be\s+)?([^.,;]{0,18}reactive[^.,;]{0,18})/i,
+    /(\breactiv[a-z]+[^.,;]{0,28})/i ]);
   f.climate = first(T,[/(?:climate\s+zone|thornthwaite)[^.]{0,40}?(zone\s*\d+|[-+]?\d+(?:\.\d+)?)/i]);
   f.footing = first(T,[
     /((?:stiffened|waffle|edge[- ]?beam)\s*raft(?:\s+slab)?)/i,
